@@ -1,30 +1,52 @@
+// components/AlertForm.tsx
 "use client";
 import { useState } from "react";
 import axios from "axios";
+import { useSession, signIn } from "next-auth/react";
 
 interface AlertFormProps {
   defaultSymbol?: string;
 }
 
 export default function AlertForm({ defaultSymbol = "" }: AlertFormProps) {
+  const { data: session, status } = useSession();
   const [symbol, setSymbol] = useState<string>(defaultSymbol);
   const [condition, setCondition] = useState<"above" | "below">("above");
   const [targetPrice, setTargetPrice] = useState<number | "">("");
   const [success, setSuccess] = useState<string | null>(null);
 
+  if (status === "loading") {
+    return <p className="text-center py-4">Checking authentication…</p>;
+  }
+
+  if (!session) {
+    return (
+      <div className="bg-white p-6 rounded-xl shadow-md max-w-md mx-auto text-center">
+        <p className="mb-4">You must be signed in to set price alerts.</p>
+        <button
+          onClick={() => signIn()}
+          className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
+        >
+          Sign in
+        </button>
+      </div>
+    );
+  }
+
   const handleSubmit = async () => {
     try {
-      await axios.post(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000'}/alerts`, {
-        symbol,
-        condition,
-        target_price: targetPrice,
-      });
+      await axios.post(
+        "/api/alerts",
+        { symbol: symbol.toUpperCase(), condition, targetPrice },
+        { withCredentials: true }
+      );
       setSuccess(`Alert set for ${symbol} ${condition} ${targetPrice}`);
+
       setSymbol(defaultSymbol);
       setCondition("above");
       setTargetPrice("");
-    } catch (error) {
-      console.error(error);
+    } catch (err) {
+      console.error(err);
       setSuccess(null);
       alert("Failed to create alert.");
     }
@@ -33,6 +55,7 @@ export default function AlertForm({ defaultSymbol = "" }: AlertFormProps) {
   return (
     <div className="bg-white p-6 rounded-xl shadow-md max-w-md mx-auto">
       <h3 className="text-xl font-semibold mb-4">Set Price Alert</h3>
+
       <input
         type="text"
         placeholder="Symbol"
@@ -40,6 +63,7 @@ export default function AlertForm({ defaultSymbol = "" }: AlertFormProps) {
         onChange={(e) => setSymbol(e.target.value.toUpperCase())}
         className="border rounded px-4 py-2 mb-3 w-full focus:ring-2 focus:ring-blue-500"
       />
+
       <div className="flex mb-3">
         <select
           value={condition}
@@ -53,10 +77,13 @@ export default function AlertForm({ defaultSymbol = "" }: AlertFormProps) {
           type="number"
           placeholder="Price"
           value={targetPrice}
-          onChange={(e) => setTargetPrice(e.target.value ? Number(e.target.value) : "")}
+          onChange={(e) =>
+            setTargetPrice(e.target.value ? Number(e.target.value) : "")
+          }
           className="border rounded-r px-4 py-2 w-full focus:ring-2 focus:ring-blue-500"
         />
       </div>
+
       <button
         onClick={handleSubmit}
         disabled={!symbol || !targetPrice}
@@ -64,6 +91,7 @@ export default function AlertForm({ defaultSymbol = "" }: AlertFormProps) {
       >
         Set Alert
       </button>
+
       {success && <p className="mt-3 text-green-600">{success}</p>}
     </div>
   );

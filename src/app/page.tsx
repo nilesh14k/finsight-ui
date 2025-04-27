@@ -4,6 +4,12 @@ import axios from "axios";
 import StockCard from "@/components/StockCard";
 import Chart from "@/components/Chart";
 import AlertForm from "@/components/AlertForm";
+import AlertsList from "@/components/AlertsList";
+import WatchlistForm from "@/components/WatchlistForm";
+import WatchlistList from "@/components/WatchlistList";
+import { useWebSocket } from "@/hooks/useWebSocket";
+import NewsFeed from "@/components/NewsFeed";
+import SocialBuzz from "@/components/SocialBuzz";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 
@@ -31,29 +37,76 @@ export default function Home() {
   const [symbol, setSymbol] = useState<string>("");
   const [stockData, setStockData] = useState<StockData | null>(null);
   const [historyData, setHistoryData] = useState<HistoricalDataPoint[]>([]);
+  const [chartData, setChartData] = useState<{ date: string; close: number }[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  const wsUrl = stockData
+    ? `ws://localhost:8000/ws/price/${stockData.symbol}`
+    : undefined;
+
+  const { data: live } = useWebSocket<{
+    price: number;
+    high: number;
+    low: number;
+    timestamp: string;
+  }>(wsUrl);
+
+  useEffect(() => {
+    if (!live) return;
+
+    setStockData((prev) =>
+      prev
+        ? {
+            ...prev,
+            price: live.price,
+            day_high: live.high,
+            day_low: live.low,
+            timestamp: live.timestamp,
+          }
+        : prev
+    );
+
+    const newPoint = {
+      date: new Date(live.timestamp).toLocaleString(),
+      close: live.price,
+    };
+    setChartData((prev) => [...prev, newPoint]);
+  }, [live]);
 
   const fetchStock = async (searchSymbol?: string) => {
     const finalSymbol = (searchSymbol || symbol).toUpperCase();
     setLoading(true);
     setError(null);
+
     try {
-      const priceRes = await axios.get<StockData>(`${API_BASE}/price?symbol=${finalSymbol}`);
-      const histRes = await axios.get<HistoricalDataPoint[]>(`${API_BASE}/history?symbol=${finalSymbol}&range=1mo`);
+      const priceRes = await axios.get<StockData>(
+        `${API_BASE}/price?symbol=${finalSymbol}`
+      );
+      const histRes = await axios.get<HistoricalDataPoint[]>(
+        `${API_BASE}/history?symbol=${finalSymbol}&range=1mo`
+      );
+
       setStockData(priceRes.data);
       setHistoryData(histRes.data);
-    } catch (e) {
-      console.error(e);
-      setError("Failed to fetch data. Please check the symbol.");
-      setStockData(null);
-      setHistoryData([]);
+
+      setChartData(histRes.data.map((p) => ({ date: p.date, close: p.close })));
+    } catch (err) {
+      console.error("fetchStock error:", err);
+
+      if (axios.isAxiosError(err) && !err.response) {
+        setError("Cannot reach server. Make sure your API is running.");
+      } else {
+        setError("Failed to fetch data. Please check the symbol.");
+        setStockData(null);
+        setHistoryData([]);
+        setChartData([]);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  // Auto-refresh when viewing a stock
   useEffect(() => {
     if (!stockData) return;
     const interval = setInterval(() => fetchStock(), 30000);
@@ -91,7 +144,7 @@ export default function Home() {
             <h2 className="text-2xl font-semibold mb-4 text-gray-800">
               🔥 Trending Stocks
             </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mb-8">
               {trendingStocks.map((stk) => (
                 <button
                   key={stk}
@@ -102,15 +155,33 @@ export default function Home() {
                 </button>
               ))}
             </div>
+
+            <WatchlistForm onCreated={() => {}} />
+            <WatchlistList onLoad={(symbols) => fetchStock(symbols[0])} />
           </section>
         ) : (
           <section className="space-y-8">
             {error && <p className="text-red-600">{error}</p>}
+
             <StockCard data={stockData} />
-            {historyData.length > 0 && <Chart data={historyData.map(({ date, close }) => ({ date, close }))} />}
+
+            {chartData.length > 0 && <Chart data={chartData} />}
+
+            <NewsFeed symbol={stockData.symbol} />
+            <SocialBuzz symbol={stockData.symbol} />
             <AlertForm defaultSymbol={stockData.symbol} />
+            <AlertsList />
+            <WatchlistForm onCreated={() => {}} />
+            <WatchlistList onLoad={(symbols) => fetchStock(symbols[0])} />
+
             <button
-              onClick={() => { setStockData(null); setHistoryData([]); setError(null); setSymbol(""); }}
+              onClick={() => {
+                setStockData(null);
+                setHistoryData([]);
+                setChartData([]);
+                setError(null);
+                setSymbol("");
+              }}
               className="text-blue-600 hover:underline"
             >
               ← Back to Home
