@@ -16,7 +16,7 @@ const fetcher = (url: string) => axios.get<Tweet[]>(url).then((res) => res.data)
 
 export default function SocialBuzz({ symbol }: { symbol: string }) {
   const cacheKey = useMemo(
-    () => (symbol ? `/api/twitter?symbol=${symbol}` : null),
+    () => (symbol ? `/api/stocktwits?symbol=${symbol}` : null),
     [symbol]
   );
 
