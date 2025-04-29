@@ -1,8 +1,8 @@
-// components/AlertForm.tsx
 "use client";
 import { useState } from "react";
 import axios from "axios";
 import { useSession, signIn } from "next-auth/react";
+import toast from "react-hot-toast";
 
 interface AlertFormProps {
   defaultSymbol?: string;
@@ -10,22 +10,21 @@ interface AlertFormProps {
 
 export default function AlertForm({ defaultSymbol = "" }: AlertFormProps) {
   const { data: session, status } = useSession();
-  const [symbol, setSymbol] = useState<string>(defaultSymbol);
+  const [symbol, setSymbol] = useState(defaultSymbol);
   const [condition, setCondition] = useState<"above" | "below">("above");
   const [targetPrice, setTargetPrice] = useState<number | "">("");
-  const [success, setSuccess] = useState<string | null>(null);
 
   if (status === "loading") {
-    return <p className="text-center py-4">Checking authentication…</p>;
+    return <p className="text-center py-2">Checking authentication…</p>;
   }
 
   if (!session) {
     return (
-      <div className="bg-white p-6 rounded-xl shadow-md max-w-md mx-auto text-center">
-        <p className="mb-4">You must be signed in to set price alerts.</p>
+      <div className="w-full max-w-md mx-auto text-center py-4">
+        <p className="mb-2 text-sm">Sign in to set price alerts.</p>
         <button
           onClick={() => signIn()}
-          className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
+          className="w-full px-3 py-2 text-sm bg-blue-600 text-white"
         >
           Sign in
         </button>
@@ -40,39 +39,44 @@ export default function AlertForm({ defaultSymbol = "" }: AlertFormProps) {
         { symbol: symbol.toUpperCase(), condition, targetPrice },
         { withCredentials: true }
       );
-      setSuccess(`Alert set for ${symbol} ${condition} ${targetPrice}`);
-
-      setSymbol(defaultSymbol);
+      toast.success(`Alert set: ${symbol} ${condition} $${targetPrice}`);
+      setSymbol("");
       setCondition("above");
       setTargetPrice("");
-    } catch (err) {
-      console.error(err);
-      setSuccess(null);
-      alert("Failed to create alert.");
+    } catch {
+      toast.error("Failed to create alert.");
     }
   };
 
   return (
-    <div className="bg-white p-6 rounded-xl shadow-md max-w-md mx-auto">
-      <h3 className="text-xl font-semibold mb-4">Set Price Alert</h3>
-
-      <input
-        type="text"
-        placeholder="Symbol"
-        value={symbol}
-        onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-        className="border rounded px-4 py-2 mb-3 w-full focus:ring-2 focus:ring-blue-500"
-      />
-
-      <div className="flex mb-3">
-        <select
-          value={condition}
-          onChange={(e) => setCondition(e.target.value as any)}
-          className="border rounded-l px-4 py-2"
-        >
-          <option value="above">Above</option>
-          <option value="below">Below</option>
-        </select>
+    <div className="w-full max-w-md mx-auto">
+      <h3 className="text-lg font-semibold mb-2">New Price Alert</h3>
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-2 mb-4">
+        <input
+          type="text"
+          placeholder="Symbol"
+          value={symbol}
+          onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+          className="border-b px-2 py-1 text-sm focus:outline-none"
+        />
+        <div className="flex flex-col gap-1">
+          <button
+            onClick={() => setCondition("above")}
+            className={`text-xs px-2 py-1 ${
+              condition === "above" ? "border-b-2" : "opacity-60"
+            }"`}
+          >
+            Above
+          </button>
+          <button
+            onClick={() => setCondition("below")}
+            className={`text-xs px-2 py-1 ${
+              condition === "below" ? "border-b-2" : "opacity-60"
+            }"`}
+          >
+            Below
+          </button>
+        </div>
         <input
           type="number"
           placeholder="Price"
@@ -80,19 +84,16 @@ export default function AlertForm({ defaultSymbol = "" }: AlertFormProps) {
           onChange={(e) =>
             setTargetPrice(e.target.value ? Number(e.target.value) : "")
           }
-          className="border rounded-r px-4 py-2 w-full focus:ring-2 focus:ring-blue-500"
+          className="border-b px-2 py-1 text-sm focus:outline-none"
         />
       </div>
-
       <button
         onClick={handleSubmit}
         disabled={!symbol || !targetPrice}
-        className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
+        className="w-full text-sm px-3 py-2 bg-green-600 text-white disabled:opacity-50"
       >
         Set Alert
       </button>
-
-      {success && <p className="mt-3 text-green-600">{success}</p>}
     </div>
   );
 }

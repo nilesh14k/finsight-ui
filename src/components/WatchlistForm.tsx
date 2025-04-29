@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import axios from "axios";
+import toast from "react-hot-toast";
 
 interface Props {
   onCreated: () => void;
@@ -9,16 +10,17 @@ interface Props {
 export default function WatchlistForm({ onCreated }: Props) {
   const [name, setName] = useState("");
   const [symbolsInput, setSymbolsInput] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async () => {
-    setError(null);
+  const submit = async () => {
+    setLoading(true);
     const symbols = symbolsInput
       .split(",")
-      .map(s => s.trim().toUpperCase())
+      .map((s) => s.trim().toUpperCase())
       .filter(Boolean);
     if (!name || symbols.length === 0) {
-      setError("Please provide a name and at least one symbol.");
+      toast.error("Name & symbols required");
+      setLoading(false);
       return;
     }
     try {
@@ -27,38 +29,40 @@ export default function WatchlistForm({ onCreated }: Props) {
         { name, symbols },
         { withCredentials: true }
       );
+      toast.success("Watchlist created");
       setName("");
       setSymbolsInput("");
       onCreated();
-    } catch (err) {
-      console.error(err);
-      setError("Could not create watchlist.");
+    } catch {
+      toast.error("Create failed");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="bg-white p-6 rounded-xl shadow-md max-w-md mx-auto">
-      <h4 className="font-semibold mb-2">New Watchlist</h4>
-      {error && <p className="text-red-500 mb-2">{error}</p>}
+    <div className="w-full max-w-md mx-auto">
+      <h4 className="text-lg font-semibold mb-2">New Watchlist</h4>
       <input
         type="text"
         placeholder="Name (e.g. Tech Stocks)"
         value={name}
-        onChange={e => setName(e.target.value)}
-        className="border rounded px-4 py-2 mb-2 w-full"
+        onChange={(e) => setName(e.target.value)}
+        className="w-full text-sm border-b px-2 py-1 mb-3 focus:outline-none"
       />
       <input
         type="text"
         placeholder="Symbols, comma-separated"
         value={symbolsInput}
-        onChange={e => setSymbolsInput(e.target.value)}
-        className="border rounded px-4 py-2 mb-4 w-full"
+        onChange={(e) => setSymbolsInput(e.target.value)}
+        className="w-full text-sm border-b px-2 py-1 mb-4 focus:outline-none"
       />
       <button
-        onClick={handleSubmit}
-        className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
+        onClick={submit}
+        disabled={loading}
+        className="w-full text-sm px-3 py-2 bg-blue-600 text-white disabled:opacity-50"
       >
-        Create
+        {loading ? "Creating…" : "Create"}
       </button>
     </div>
   );
